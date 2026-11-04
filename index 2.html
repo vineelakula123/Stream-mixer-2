@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stream Mixer</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f2f4f7;--panel:#fff;--ink:#161b22;--mute:#5c6673;--line:#d5dae1;--acc:#0b8a72;--accink:#fff;--bad:#c23a3a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#11151b;--panel:#1a2029;--ink:#e8edf3;--mute:#9aa6b4;--line:#2c3541;--acc:#4fd1b0;--accink:#08201a;--bad:#ff7b7b;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#11151b;--panel:#1a2029;--ink:#e8edf3;--mute:#9aa6b4;--line:#2c3541;--acc:#4fd1b0;--accink:#08201a;--bad:#ff7b7b;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 Manrope,system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:860px;margin:0 auto;padding:16px}
+h1{font-size:1.5rem;font-weight:800;margin:4px 0 2px}
+h2{font-size:1.05rem;font-weight:700;margin:0 0 10px}
+p{margin:0 0 10px;color:var(--mute)}
+.sub{margin-bottom:14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+.tabs button{flex:1}
+button{font:600 15px Manrope,system-ui,sans-serif;min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+button.on,button.go{background:var(--acc);color:var(--accink);border-color:var(--acc)}
+button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+label{display:block;font-size:.85rem;color:var(--mute);margin:8px 0 4px}
+select,textarea{width:100%;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;padding:8px}
+textarea{min-height:90px;font:12px/1.3 ui-monospace,Menlo,monospace;word-break:break-all}
+input[type=range]{width:100%}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1 1 140px}
+.stage{position:relative;aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden}
+.stage video{width:100%;height:100%;object-fit:contain;display:block;background:#000}
+#cam{position:absolute;right:2%;bottom:3%;width:24%;height:24%;object-fit:cover!important;border-radius:10px;border:2px solid var(--acc);display:none}
+.st{font-size:.85rem;color:var(--mute);margin-top:8px}.st b{color:var(--acc)}
+.err{color:var(--bad)}
+.hide{display:none}
+.meter{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:4px}.meter i{display:block;height:100%;width:0;background:var(--acc)}
+</style>
+</head>
+<body>
+<main>
+<h1>Stream Mixer</h1>
+<p class="sub">PS5 capture card on the iPad, phone as a wireless camera and mic, one mixed sound.</p>
+<div class="tabs"><button id="tR" class="on">This is the iPad</button><button id="tP">This is the phone</button></div>
+
+<section id="recv">
+  <div class="panel">
+    <h2>1. Capture card</h2>
+    <button id="scan" class="go">Allow access and find devices</button>
+    <label for="vsel">Video</label><select id="vsel"></select>
+    <label for="asel">Game audio</label><select id="asel"></select>
+    <button id="start" style="margin-top:10px;width:100%">Start capture</button>
+    <div class="st" id="s1"></div>
+  </div>
+
+  <div class="stage"><video id="main" autoplay playsinline muted></video><video id="cam" autoplay playsinline muted></video></div>
+  <div class="row" style="margin-top:8px"><button id="fs">Full screen</button></div>
+  <label for="sx">Camera width (x)</label><input id="sx" type="range" min="10" max="60" value="24">
+  <label for="sy">Camera height (y)</label><input id="sy" type="range" min="10" max="60" value="24">
+
+  <div class="panel" style="margin-top:14px">
+    <h2>2. Connect the phone</h2>
+    <p>Both devices on the same Wi-Fi. Make the code, send it to the phone (Messages, Notes, AirDrop), then paste the phone's reply here.</p>
+    <button id="mk" class="go">Make code for phone</button>
+    <label for="offer">Code for phone</label><textarea id="offer" readonly></textarea>
+    <button id="cpo">Copy code</button>
+    <label for="ans">Reply from phone</label><textarea id="ans"></textarea>
+    <button id="join" class="go" style="margin-top:8px;width:100%">Connect phone</button>
+    <div class="st" id="s2"></div>
+  </div>
+
+  <div class="panel">
+    <h2>3. Mix</h2>
+    <label for="gA">Game sound</label><input id="gA" type="range" min="0" max="150" value="100"><div class="meter"><i id="mA"></i></div>
+    <label for="gM">Phone mic</label><input id="gM" type="range" min="0" max="200" value="100"><div class="meter"><i id="mM"></i></div>
+    <label><input type="checkbox" id="mon" checked> Play the mix through the iPad</label>
+    <p>To go live, start a screen broadcast from Control Center into your streaming app while this page is open; it carries this mix.</p>
+  </div>
+</section>
+
+<section id="phone" class="hide">
+  <div class="panel">
+    <h2>Phone camera and mic</h2>
+    <label for="face">Camera</label><select id="face"><option value="user">Front</option><option value="environment">Back</option></select>
+    <label for="poffer">Code from iPad</label><textarea id="poffer"></textarea>
+    <button id="pgo" class="go" style="margin-top:8px;width:100%">Start camera and make reply</button>
+    <video id="pv" autoplay playsinline muted style="width:100%;border-radius:10px;margin-top:10px;display:none;background:#000"></video>
+    <label for="pans">Reply for iPad</label><textarea id="pans" readonly></textarea>
+    <button id="cpa">Copy reply</button>
+    <div class="st" id="s3"></div>
+  </div>
+</section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+let ctx,master,pc,capStream;
+const say=(id,t,e)=>{$(id).innerHTML=e?'<span class="err">'+t+'</span>':t};
+const tabs=p=>{$('recv').classList.toggle('hide',p);$('phone').classList.toggle('hide',!p);$('tR').classList.toggle('on',!p);$('tP').classList.toggle('on',p)};
+$('tR').onclick=()=>tabs(false);$('tP').onclick=()=>tabs(true);
+
+function audio(){
+  if(!ctx){ctx=new (window.AudioContext||window.webkitAudioContext)();master=ctx.createGain();master.connect(ctx.destination)}
+  if(ctx.state!=='running')ctx.resume();
+}
+function lane(stream,gainEl,meterEl){
+  audio();
+  const src=ctx.createMediaStreamSource(stream),g=ctx.createGain(),an=ctx.createAnalyser();
+  an.fftSize=256;g.gain.value=gainEl.value/100;
+  src.connect(g);g.connect(an);an.connect(master);
+  gainEl.oninput=()=>g.gain.value=gainEl.value/100;
+  const buf=new Uint8Array(an.frequencyBinCount);
+  (function tick(){an.getByteTimeDomainData(buf);let m=0;for(const v of buf)m=Math.max(m,Math.abs(v-128));meterEl.style.width=Math.min(100,m*1.6)+'%';requestAnimationFrame(tick)})();
+}
+$('mon').onchange=()=>{audio();master.gain.value=$('mon').checked?1:0};
+
+$('scan').onclick=async()=>{
+  try{
+    const t=await navigator.mediaDevices.getUserMedia({video:true,audio:true});t.getTracks().forEach(x=>x.stop());
+    const d=await navigator.mediaDevices.enumerateDevices();
+    const fill=(sel,k)=>{sel.innerHTML='';d.filter(x=>x.kind===k).forEach((x,i)=>sel.add(new Option(x.label||k+' '+(i+1),x.deviceId)))};
+    fill($('vsel'),'videoinput');fill($('asel'),'audioinput');
+    say('s1','Found '+$('vsel').options.length+' video and '+$('asel').options.length+' audio devices. Pick your capture card for both.');
+  }catch(e){say('s1','Access was blocked: '+e.message+'. Allow camera and mic for this page and try again.',1)}
+};
+$('start').onclick=async()=>{
+  try{
+    if(capStream)capStream.getTracks().forEach(x=>x.stop());
+    const sameDev=$('vsel').value&&$('asel').value;
+    capStream=await navigator.mediaDevices.getUserMedia({video:{deviceId:{exact:$('vsel').value},width:{ideal:1920},height:{ideal:1080},frameRate:{ideal:60}},audio:{deviceId:{exact:$('asel').value},echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    $('main').srcObject=new MediaStream(capStream.getVideoTracks());
+    if(capStream.getAudioTracks().length)lane(new MediaStream(capStream.getAudioTracks()),$('gA'),$('mA'));
+    say('s1','<b>Capture running.</b> If the game sound is silent, pick the capture card under Game audio and start again.');
+  }catch(e){say('s1','Could not start: '+e.message,1)}
+};
+
+function place(){
+  const c=$('cam');
+  c.style.width=$('sx').value+'%';c.style.height=$('sy').value+'%';
+}
+$('sx').oninput=$('sy').oninput=place;place();
+$('fs').onclick=()=>{const s=document.querySelector('.stage');(s.requestFullscreen||s.webkitRequestFullscreen||(()=>{})).call(s)};
+
+const ice=p=>new Promise(r=>{if(p.iceGatheringState==='complete')return r();p.onicegatheringstatechange=()=>p.iceGatheringState==='complete'&&r();setTimeout(r,3500)});
+const pack=d=>btoa(unescape(encodeURIComponent(JSON.stringify(d))));
+const unpack=s=>JSON.parse(decodeURIComponent(escape(atob(s.trim()))));
+const copy=async(el,msg)=>{try{await navigator.clipboard.writeText(el.value)}catch(e){el.select()}};
+
+$('mk').onclick=async()=>{
+  try{
+    audio();
+    pc=new RTCPeerConnection({iceServers:[]});
+    pc.addTransceiver('video',{direction:'recvonly'});pc.addTransceiver('audio',{direction:'recvonly'});
+    pc.ontrack=e=>{
+      const s=new MediaStream([e.track]);
+      if(e.track.kind==='video'){$('cam').srcObject=s;$('cam').style.display='block'}
+      else{const a=new Audio();a.muted=true;a.srcObject=s;lane(s,$('gM'),$('mM'))}
+    };
+    pc.onconnectionstatechange=()=>say('s2','Phone link: <b>'+pc.connectionState+'</b>',pc.connectionState==='failed');
+    await pc.setLocalDescription(await pc.createOffer());await ice(pc);
+    $('offer').value=pack(pc.localDescription);
+    say('s2','Code ready. Send it to the phone.');
+  }catch(e){say('s2','Failed: '+e.message,1)}
+};
+$('cpo').onclick=()=>copy($('offer'));
+$('join').onclick=async()=>{
+  try{await pc.setRemoteDescription(unpack($('ans').value));say('s2','Connecting…')}
+  catch(e){say('s2','That reply is not valid. Copy the whole reply from the phone.',1)}
+};
+
+$('pgo').onclick=async()=>{
+  try{
+    const off=unpack($('poffer').value);
+    const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:$('face').value,width:{ideal:1280}},audio:{echoCancellation:true,noiseSuppression:true}});
+    $('pv').srcObject=st;$('pv').style.display='block';
+    const p=new RTCPeerConnection({iceServers:[]});
+    await p.setRemoteDescription(off);
+    st.getTracks().forEach(t=>p.addTrack(t,st));
+    await p.setLocalDescription(await p.createAnswer());await ice(p);
+    $('pans').value=pack(p.localDescription);
+    p.onconnectionstatechange=()=>say('s3','Link: <b>'+p.connectionState+'</b>. Keep this page open.');
+    say('s3','Reply ready. Send it back to the iPad.');
+  }catch(e){say('s3','Failed: '+e.message,1)}
+};
+$('cpa').onclick=()=>copy($('pans'));
+</script>
+</body>
+</html>
