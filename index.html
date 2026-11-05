@@ -54,7 +54,8 @@ input[type=range]{width:100%}
   </div>
 
   <div class="stage"><video id="main" autoplay playsinline muted></video><video id="cam" autoplay playsinline muted></video></div>
-  <div class="row" style="margin-top:8px"><button id="fs">Full screen</button></div>
+  <div class="row" style="margin-top:8px"><button id="fs">Full screen</button><button id="spk">Fix sound to speaker</button><button id="direct">Test card sound directly</button></div>
+  <div id="adiag" style="font-size:.8rem;color:var(--mute);margin-top:6px"></div><audio id="ta" playsinline></audio>
   <label for="sx">Camera width (x)</label><input id="sx" type="range" min="10" max="60" value="24">
   <label for="sy">Camera height (y)</label><input id="sy" type="range" min="10" max="60" value="24">
 
@@ -99,9 +100,14 @@ const say=(id,t,e)=>{$(id).innerHTML=e?'<span class="err">'+t+'</span>':t};
 const tabs=p=>{$('recv').classList.toggle('hide',p);$('phone').classList.toggle('hide',!p);$('tR').classList.toggle('on',!p);$('tP').classList.toggle('on',p)};
 $('tR').onclick=()=>tabs(false);$('tP').onclick=()=>tabs(true);
 
+function speaker(){
+  try{if(navigator.audioSession)navigator.audioSession.type='play-and-record'}catch(e){}
+  try{if(ctx&&ctx.setSinkId)ctx.setSinkId('')}catch(e){}
+}
 function audio(){
   if(!ctx){ctx=new (window.AudioContext||window.webkitAudioContext)();master=ctx.createGain();master.connect(ctx.destination)}
   if(ctx.state!=='running')ctx.resume();
+  speaker();
 }
 function lane(stream,gainEl,meterEl){
   audio();
@@ -130,6 +136,11 @@ $('start').onclick=async()=>{
     capStream=await navigator.mediaDevices.getUserMedia({video:{deviceId:{exact:$('vsel').value},width:{ideal:1920},height:{ideal:1080},frameRate:{ideal:60}},audio:{deviceId:{exact:$('asel').value},echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
     $('main').srcObject=new MediaStream(capStream.getVideoTracks());
     if(capStream.getAudioTracks().length)lane(new MediaStream(capStream.getAudioTracks()),$('gA'),$('mA'));
+    speaker();setTimeout(speaker,500);setTimeout(speaker,2000);
+    const at=capStream.getAudioTracks()[0];
+    if(!at){say('s1','<b>No audio track from the card.</b> Pick V-Z632 under Game audio and start again.',1);return}
+    const info=()=>{const st=at.getSettings?at.getSettings():{};$('adiag').textContent='Card audio: '+at.label+' | '+at.readyState+(at.muted?' | MUTED (no sound arriving)':' | live')+(st.sampleRate?' | '+st.sampleRate+' Hz':'')+(st.channelCount?' | '+st.channelCount+'ch':'')};
+    at.onmute=info;at.onunmute=info;at.onended=info;info();setTimeout(info,1500);
     say('s1','<b>Capture running.</b> If the game sound is silent, pick the capture card under Game audio and start again.');
   }catch(e){say('s1','Could not start: '+e.message,1)}
 };
@@ -139,6 +150,12 @@ function place(){
   c.style.width=$('sx').value+'%';c.style.height=$('sy').value+'%';
 }
 $('sx').oninput=$('sy').oninput=place;place();
+$('spk').onclick=()=>{audio();speaker();if(ctx)ctx.resume();say('s1','Asked iPad to play through the speaker. Also check Control Center and pick iPad Speakers.')};
+$('direct').onclick=async()=>{
+  if(!capStream||!capStream.getAudioTracks().length){say('s1','Start capture first.',1);return}
+  const a=$('ta');a.srcObject=new MediaStream(capStream.getAudioTracks());a.muted=false;a.volume=1;
+  try{await a.play();say('s1','Playing card sound directly. If you hear the game now, tell me.')}catch(e){say('s1','Could not play: '+e.message,1)}
+};
 $('fs').onclick=()=>{const s=document.querySelector('.stage');(s.requestFullscreen||s.webkitRequestFullscreen||(()=>{})).call(s)};
 
 const ice=p=>new Promise(r=>{if(p.iceGatheringState==='complete')return r();p.onicegatheringstatechange=()=>p.iceGatheringState==='complete'&&r();setTimeout(r,3500)});
